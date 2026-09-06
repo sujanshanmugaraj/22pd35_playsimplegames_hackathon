@@ -89,24 +89,211 @@ MOVES: 2
 
 ---
 
-## 5. File Structure
+## 5. File Structure & Architecture
 
 ```
-solve.py          ← Main solver + CLI (all logic in one file)
-solve_with_time.py← Extended version with built-in test runner & timing
-validate.py       ← Independent move-by-move legality verifier
-animation.py      ← Terminal visualiser: animated dual side-by-side playback
-requirements.txt  ← Empty (standard library only)
-README.md         ← This file
-WRITEUP.md        ← Technical write-up (state repr, solver comparison)
+solve.py            ← Main solver + CLI  (submitted grader entry point)
+solve_with_time.py  ← Extended version: built-in batch test runner + timing report
+validate.py         ← Independent move-by-move legality verifier
+animation.py        ← Terminal visualiser: animated dual side-by-side playback
+requirements.txt    ← Standard library only — pip install is a no-op
+README.md           ← This file
+WRITEUP.md          ← Technical write-up (state repr, solver comparison)
 tests/
-  test1.txt       ← Starter: 4×5, no modifiers
-  test2.txt       ← Medium: 6×6, more blocks
-  test3.txt       ← Walls: 6×6 with # cells
-  test4.txt       ← Ice + Directional: the hardest
-  test5.txt       ← Ice only: frozen block unlocks after 1 exit
-  test6..10.txt   ← Extra test levels
+  test1.txt         ← Starter: 4×5, no modifiers
+  test2.txt         ← Medium: 6×6, more blocks
+  test3.txt         ← Walls: 6×6 with # cells
+  test4.txt         ← Ice + Directional: the hardest
+  test5.txt         ← Ice only: frozen block unlocks after 1 exit
+  test6..10.txt     ← Extra test levels
 ```
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                        solve.py                         │
+│                                                         │
+│  ┌──────────┐   ┌──────────────────────────────────┐   │
+│  │  Parser  │   │          Level (immutable)        │   │
+│  │          │──▶│  Block[] · Gate[] · wall_mask     │   │
+│  │parse_    │   │  exit_anchors · dist_map (BFS)    │   │
+│  │level()   │   │  canon_groups · target_idx        │   │
+│  └──────────┘   └──────────────┬───────────────────┘   │
+│                                │                        │
+│                    ┌───────────▼───────────┐           │
+│                    │    State = tuple[int]  │           │
+│                    │  anchor cell per block │           │
+│                    │  -1 = exited           │           │
+│                    └───────────┬───────────┘           │
+│                                │                        │
+│           ┌────────────────────▼──────────────────┐    │
+│           │            neighbors(level, state)     │    │
+│           │  bitboard occupancy · slide walk       │    │
+│           │  ice check · directional dirs          │    │
+│           │  resolve_exits (cascade) · yield       │    │
+│           └──────┬──────────────────┬─────────────┘    │
+│                  │                  │                   │
+│    ┌─────────────▼──────┐  ┌───────▼──────────────┐   │
+│    │  Solver 1: COMPLETE │  │  Solver 2: FAST       │   │
+│    │                    │  │                        │   │
+│    │  decompose()       │  │  solve_wastar()        │   │
+│    │  → sub_level()     │  │  (weighted A*, quick)  │   │
+│    │  → _astar() per    │  │        ↓               │   │
+│    │    group           │  │  solve_beam()          │   │
+│    │        ↓           │  │  (bounded-width BFS)   │   │
+│    │  solve_exitmax()   │  │  → _beam_once(k)       │   │
+│    │  (ice / fallback)  │  │  → _shorten()          │   │
+│    └─────────────┬──────┘  └───────┬──────────────┘   │
+│                  └────────┬─────────┘                  │
+│                           │                             │
+│                    ┌──────▼──────┐                     │
+│                    │   _emit()   │  stdout only         │
+│                    │  STATUS     │  STATUS: SOLVED       │
+│                    │  MOVES      │  MOVES: N             │
+│                    │  block x y  │  block x y ...        │
+│                    └─────────────┘                      │
+└─────────────────────────────────────────────────────────┘
+
+  validate.py ──calls──▶ solve.py subprocess ──▶ re-simulates output
+  animation.py ─calls──▶ solve.py subprocess ──▶ renders board in terminal
+  solve_with_time.py ───▶ same engine as solve.py + batch test runner
+```
+
+---
+
+## 5a. `solve_with_time.py` — Batch Test Runner with Timing
+
+`solve_with_time.py` is an **extended version of the solver** that includes a built-in test suite runner and detailed timing report. It has the same solver engine as `solve.py` but adds two modes:
+
+### Single-file mode (identical to solve.py)
+
+```bash
+# Solve one level
+python solve_with_time.py tests/test1.txt
+
+# Choose solver
+python solve_with_time.py tests/test4.txt --solver fast
+
+# With debug logs
+python solve_with_time.py tests/test4.txt --solver complete --verbose
+
+# Custom time limit
+python solve_with_time.py tests/test4.txt --time-limit 30
+```
+
+### Batch test-all mode (built-in)
+
+```bash
+# Run ALL tests in tests/ through both solvers and print a full report
+python solve_with_time.py --test-all
+
+# Run only one solver
+python solve_with_time.py --test-all --solvers complete
+
+# Custom test folder
+python solve_with_time.py --test-all --test-dir tests
+
+# With verbose solver logs per test
+python solve_with_time.py --test-all --verbose
+```
+
+### Sample output
+
+```
+=======================================================
+ COLOR BLOCK CRUSH -- Test Suite Results
+=======================================================
+Level          Solver          Result  Moves      Time
+-------------------------------------------------------
+test1.txt      complete  [PASS] SOLVED      2    0.04s
+               fast      [PASS] SOLVED      2    0.03s
+-------------------------------------------------------
+test2.txt      complete  [PASS] SOLVED     10    0.51s
+               fast      [PASS] SOLVED     10    0.49s
+-------------------------------------------------------
+test3.txt      complete  [PASS] SOLVED     24    1.12s
+               fast      [PASS] SOLVED     25    0.98s
+-------------------------------------------------------
+test4.txt      complete  [PASS] SOLVED     56   41.20s
+               fast      [PASS] SOLVED    560   44.10s
+-------------------------------------------------------
+test5.txt      complete  [PASS] SOLVED     43    3.30s
+               fast      [PASS] SOLVED     66    2.90s
+-------------------------------------------------------
+
+=======================================================
+ SUMMARY
+=======================================================
+Solver        Tests  Solved  Passed  TotalMoves  TotalTime  AvgTime
+-------------------------------------------------------------------
+complete          5       5       5         135    46.17s    9.23s
+fast              5       5       5         663    48.50s    9.70s
+
+  *** ALL TESTS PASSED ***
+```
+
+> Each row shows `[PASS]` / `[FAIL]`, the status, move count, and wall-clock time. The summary table shows total and average time per solver. Solutions are validated in-process after solving.
+
+---
+
+## 5b. `animation.py` — Real-time Terminal Visualiser
+
+`animation.py` provides a **live animated dual-panel display** in your terminal showing both the `complete` and `fast` solvers replaying their solutions step-by-step, side by side.
+
+### What it shows
+
+```
+=== COLOR BLOCK CRUSH -- REALTIME DUAL COMPARISON ===
+File: tests/test3.txt | Grid: 6x6 | Speed: 0.15s/move
+
+┌──── COMPLETE ─────┐        ┌──── FAST ─────────┐
+Step: 3/24  | Exited: 1/11   Step: 3/25  | Exited: 1/11
+Action: Move 'A' -> (2,0)    Action: Move 'A' -> (2,0)
+┌────────────────┐            ┌────────────────┐
+│▼▼──────────────│            │▼▼──────────────│
+│ ██  R1 R1      │            │ ██  R1 R1      │
+│    G2 G2       │            │    G2 G2       │
+│       ██       │            │       ██       │
+└────────────────┘            └────────────────┘
+```
+
+- **Colored blocks** are rendered with ANSI colors matching their color letter.
+- **Walls** (`#`) appear as gray `██` cells.
+- **Frozen (ice) blocks** are shown in cyan.
+- **Gate arrows** (`▼`, `▲`, `►`, `◄`) appear on the board border in matching colors.
+- Both panels update simultaneously, one move per `speed` seconds.
+
+### How to run
+
+```bash
+# Animate one level (default speed: 0.15s per move)
+python animation.py tests/test1.txt
+
+# Animate a specific level
+python animation.py tests/test4.txt
+
+# Custom speed (seconds per move)
+python animation.py tests/test3.txt 0.3      # slower
+python animation.py tests/test3.txt 0.05     # faster
+
+# Animate ALL tests in sequence
+python animation.py --all
+python animation.py --all 0.1
+```
+
+### How it works internally
+
+1. Calls `solve.py` (via subprocess) for both `complete` and `fast` solvers.
+2. Parses both solution outputs into move lists.
+3. Replays both solutions step-by-step in a loop:
+   - Applies each move to an in-memory board state.
+   - Calls `resolve_exits()` to cascade auto-exits.
+   - Renders both boards side-by-side using ANSI escape codes.
+   - Clears the terminal and redraws each frame.
+4. When one solver finishes before the other, its panel shows `DONE (Goal Reached)` while the other continues.
+
+> **Note:** Animation requires a terminal that supports ANSI color codes (standard on Linux/macOS; on Windows use Windows Terminal or PowerShell — not the old cmd.exe).
 
 ---
 
