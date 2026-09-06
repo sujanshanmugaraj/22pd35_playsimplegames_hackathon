@@ -1,0 +1,21 @@
+# Color Block Crush Solver -- Python Dependencies
+# ================================================
+# This project has NO third-party dependencies.
+# It runs entirely on the Python 3.8+ standard library.
+#
+# Standard library modules used:
+#   sys           -- command-line args, stdin/stdout/stderr, exit codes
+#   re            -- regex tokenisation of level grid files
+#   time          -- solver time-limit enforcement and timing
+#   heapq         -- priority queue for A*, wA*, and ExitMax search
+#   argparse      -- CLI argument parsing
+#   collections   -- defaultdict (adjacency lists), deque (BFS queues)
+#   os            -- file path utilities (os.path, os.listdir)
+#   subprocess    -- validate.py launches solve.py as a child process
+#   glob          -- batch discovery of test *.txt files
+#
+# Python version requirement:
+#   python >= 3.8
+#
+# To install (no-op, kept for compatibility with pip workflows):
+#   pip install -r requirements.txt
