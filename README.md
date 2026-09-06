@@ -5,29 +5,9 @@
 > Two genuinely different solvers, both returning within 60 seconds on all provided test levels.
 
 ---
-
-## Table of Contents
-
-1. [What is this puzzle?](#1-what-is-this-puzzle)
-2. [Setup & Installation](#2-setup--installation)
-3. [Running the Solver](#3-running-the-solver)
-4. [Output Format](#4-output-format)
-5. [File Structure](#5-file-structure)
-6. [Level Format (ASCII)](#6-level-format-ascii)
-7. [Code Breakdown — solve.py](#7-code-breakdown--solvepy)
-   - [Data Model: Block, Gate, Level](#71-data-model-block-gate-level)
-   - [State Representation](#72-state-representation)
-   - [Move Generation (neighbors)](#73-move-generation-neighbors)
-   - [Heuristic & Canonicalisation](#74-heuristic--canonicalisation)
-   - [Decomposition](#75-decomposition)
-   - [Solver 1 — Complete](#76-solver-1--complete)
-   - [Solver 2 — Fast](#77-solver-2--fast)
-   - [Parser](#78-parser)
-8. [Solver Approaches in Detail](#8-solver-approaches-in-detail)
-9. [Handling Special Rules](#9-handling-special-rules-ice--directional)
-10. [Test Results](#10-test-results)
-11. [Validation & Verification](#11-validation--verification)
-
+## Name : Sujan S
+## Roll No : 22PD35
+## Course : MSc Data Science
 ---
 
 ## 1. What is this puzzle?
@@ -523,28 +503,10 @@ else:             self.dirs = DIRS     # all four directions
 
 ## 10. Test Results
 
-Results on the provided test suite (reference laptop, `complete` solver):
+<img width="597" height="344" alt="Screenshot 2026-09-06 232456" src="https://github.com/user-attachments/assets/f4130d8c-729c-4ae1-8a94-68eb77b45fec" />
 
-| Level | Grid | Blocks | Special | Status | Moves | Time |
-|---|---|---|---|---|---|---|
-| test1 | 4×5 | 2 | none | SOLVED | 2 | < 1s |
-| test2 | 6×6 | 10 | none | SOLVED | 10 | < 1s |
-| test3 | 6×6 | 11 | walls | SOLVED | 24 | ~1s |
-| test4 | 6×6 | 14 | ice + directional | SOLVED | 56 | ~41s |
-| test5 | 3×7 | 14 | ice | SOLVED | 43 | ~3s |
 
-`fast` solver results:
-
-| Level | Status | Moves | Time |
-|---|---|---|---|
-| test1 | SOLVED | 2 | < 1s |
-| test2 | SOLVED | 10 | < 1s |
-| test3 | SOLVED | 25 | ~1s |
-| test4 | SOLVED | ~560 | ~44s |
-| test5 | SOLVED | 66 | ~3s |
-
-> Both solvers return within 60 seconds on all 5 test levels. `complete` finds shorter solutions; `fast` uses beam search which is a fundamentally different algorithm (bounded-width, level-synchronous) rather than the same algorithm with different parameters.
-
+> Both solvers return within 60 seconds on all 5 test levels. 
 ---
 
 ## 11. Validation & Verification
