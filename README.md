@@ -109,51 +109,8 @@ tests/
 ```
 
 ### Architecture Overview
+<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/15a1590a-7705-4bc4-8918-16b57277b190" />
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                        solve.py                         │
-│                                                         │
-│  ┌──────────┐   ┌──────────────────────────────────┐   │
-│  │  Parser  │   │          Level (immutable)        │   │
-│  │          │──▶│  Block[] · Gate[] · wall_mask     │   │
-│  │parse_    │   │  exit_anchors · dist_map (BFS)    │   │
-│  │level()   │   │  canon_groups · target_idx        │   │
-│  └──────────┘   └──────────────┬───────────────────┘   │
-│                                │                        │
-│                    ┌───────────▼───────────┐           │
-│                    │    State = tuple[int]  │           │
-│                    │  anchor cell per block │           │
-│                    │  -1 = exited           │           │
-│                    └───────────┬───────────┘           │
-│                                │                        │
-│           ┌────────────────────▼──────────────────┐    │
-│           │            neighbors(level, state)     │    │
-│           │  bitboard occupancy · slide walk       │    │
-│           │  ice check · directional dirs          │    │
-│           │  resolve_exits (cascade) · yield       │    │
-│           └──────┬──────────────────┬─────────────┘    │
-│                  │                  │                   │
-│    ┌─────────────▼──────┐  ┌───────▼──────────────┐   │
-│    │  Solver 1: COMPLETE │  │  Solver 2: FAST       │   │
-│    │                    │  │                        │   │
-│    │  decompose()       │  │  solve_wastar()        │   │
-│    │  → sub_level()     │  │  (weighted A*, quick)  │   │
-│    │  → _astar() per    │  │        ↓               │   │
-│    │    group           │  │  solve_beam()          │   │
-│    │        ↓           │  │  (bounded-width BFS)   │   │
-│    │  solve_exitmax()   │  │  → _beam_once(k)       │   │
-│    │  (ice / fallback)  │  │  → _shorten()          │   │
-│    └─────────────┬──────┘  └───────┬──────────────┘   │
-│                  └────────┬─────────┘                  │
-│                           │                             │
-│                    ┌──────▼──────┐                     │
-│                    │   _emit()   │  stdout only         │
-│                    │  STATUS     │  STATUS: SOLVED       │
-│                    │  MOVES      │  MOVES: N             │
-│                    │  block x y  │  block x y ...        │
-│                    └─────────────┘                      │
-└─────────────────────────────────────────────────────────┘
 
   validate.py ──calls──▶ solve.py subprocess ──▶ re-simulates output
   animation.py ─calls──▶ solve.py subprocess ──▶ renders board in terminal
@@ -200,37 +157,7 @@ python solve_with_time.py --test-all --verbose
 
 ### Sample output
 
-```
-=======================================================
- COLOR BLOCK CRUSH -- Test Suite Results
-=======================================================
-Level          Solver          Result  Moves      Time
--------------------------------------------------------
-test1.txt      complete  [PASS] SOLVED      2    0.04s
-               fast      [PASS] SOLVED      2    0.03s
--------------------------------------------------------
-test2.txt      complete  [PASS] SOLVED     10    0.51s
-               fast      [PASS] SOLVED     10    0.49s
--------------------------------------------------------
-test3.txt      complete  [PASS] SOLVED     24    1.12s
-               fast      [PASS] SOLVED     25    0.98s
--------------------------------------------------------
-test4.txt      complete  [PASS] SOLVED     56   41.20s
-               fast      [PASS] SOLVED    560   44.10s
--------------------------------------------------------
-test5.txt      complete  [PASS] SOLVED     43    3.30s
-               fast      [PASS] SOLVED     66    2.90s
--------------------------------------------------------
 
-=======================================================
- SUMMARY
-=======================================================
-Solver        Tests  Solved  Passed  TotalMoves  TotalTime  AvgTime
--------------------------------------------------------------------
-complete          5       5       5         135    46.17s    9.23s
-fast              5       5       5         663    48.50s    9.70s
-
-  *** ALL TESTS PASSED ***
 ```
 
 > Each row shows `[PASS]` / `[FAIL]`, the status, move count, and wall-clock time. The summary table shows total and average time per solver. Solutions are validated in-process after solving.
@@ -690,7 +617,11 @@ else:             self.dirs = DIRS     # all four directions
 
 ## 10. Test Results
 
+<img width="296" height="886" alt="image" src="https://github.com/user-attachments/assets/0386a5d7-4b07-44cf-a1d8-ed0dd3f47e88" />
+
 <img width="597" height="344" alt="Screenshot 2026-09-06 232456" src="https://github.com/user-attachments/assets/f4130d8c-729c-4ae1-8a94-68eb77b45fec" />
+
+<img width="476" height="278" alt="image" src="https://github.com/user-attachments/assets/59f5b9c4-eef1-4dd3-b8b4-62c267df6010" />
 
 
 > Both solvers return within 60 seconds on all 5 test levels. 
