@@ -174,6 +174,7 @@ python solve_with_time.py --test-all --verbose
 === COLOR BLOCK CRUSH -- REALTIME DUAL COMPARISON ===
 File: tests/test3.txt | Grid: 6x6 | Speed: 0.15s/move
 
+
 ┌──── COMPLETE ─────┐        ┌──── FAST ─────────┐
 Step: 3/24  | Exited: 1/11   Step: 3/25  | Exited: 1/11
 Action: Move 'A' -> (2,0)    Action: Move 'A' -> (2,0)
@@ -183,6 +184,7 @@ Action: Move 'A' -> (2,0)    Action: Move 'A' -> (2,0)
 │    G2 G2       │            │    G2 G2       │
 │       ██       │            │       ██       │
 └────────────────┘            └────────────────┘
+
 ```
 
 - **Colored blocks** are rendered with ANSI colors matching their color letter.
@@ -619,9 +621,12 @@ else:             self.dirs = DIRS     # all four directions
 
 <img width="296" height="886" alt="image" src="https://github.com/user-attachments/assets/0386a5d7-4b07-44cf-a1d8-ed0dd3f47e88" />
 
+
 <img width="597" height="344" alt="Screenshot 2026-09-06 232456" src="https://github.com/user-attachments/assets/f4130d8c-729c-4ae1-8a94-68eb77b45fec" />
 
+
 <img width="476" height="278" alt="image" src="https://github.com/user-attachments/assets/59f5b9c4-eef1-4dd3-b8b4-62c267df6010" />
+
 
 
 > Both solvers return within 60 seconds on all 5 test levels. 
