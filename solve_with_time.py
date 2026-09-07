@@ -888,7 +888,6 @@ def _simulate(level, path):
     """Re-simulate a solved path and return (valid, error_msg).
     path is a list of (block_id_str, cell_int) pairs."""
     st = list(initial_state(level))
-    w = level.w
     for step, (bid, cell) in enumerate(path):
         if bid not in level.index:
             return False, f"step {step}: unknown block {bid}"
@@ -899,9 +898,9 @@ def _simulate(level, path):
         nex = sum(1 for a in st if a < 0)
         if blk.ice >= 0 and nex < blk.ice:
             return False, f"step {step}: block {bid} is FROZEN"
-        # legal destinations for this block in current state
-        legal = {na for _, na, _ in neighbors(level, tuple(st)) if _ and True}
-        # cheaper: just check via _block_dests geometry
+        # legal destinations for this block in the current state (pure
+        # geometry -- cheaper than calling neighbors(), which would compute
+        # moves for every other block too just to check one)
         legal_dests = _block_dests(level, st, i)
         if cell not in legal_dests:
             return False, f"step {step}: {bid}->cell {cell} is illegal"
@@ -916,8 +915,6 @@ def _simulate(level, path):
 # --------------------------------------------------------------------------
 
 SOLVERS = ["complete", "fast"]
-
-_STATUS_ICON = {"SOLVED": "PASS", "UNSOLVABLE": "PASS", "TIMEOUT": "FAIL", "ERROR": "FAIL"}
 
 
 def _run_one(level_path, solver_name, time_limit, verbose):
@@ -1028,8 +1025,7 @@ def run_all_tests(test_dir="tests", time_limit=DEFAULT_TIME_LIMIT,
             first = False
         print(sep)
 
-    # ── per-solver summary ────────────────────────────────────────────
-    n_lvl = len(files)
+    # per-solver summary
     print()
     print("=" * len(hdr))
     print(" SUMMARY")
@@ -1063,7 +1059,6 @@ def run_all_tests(test_dir="tests", time_limit=DEFAULT_TIME_LIMIT,
 
 def main():
     parser = argparse.ArgumentParser(description="Color Block Crush solver")
-    # Mutually exclusive: single-level mode vs test-suite mode
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("level_file", nargs="?", default=None,
                        help="Path to a single level file to solve")
@@ -1088,7 +1083,6 @@ def main():
                       solvers=solvers, verbose=args.verbose)
         return
 
-    # ── single-level mode ──────────────────────────────────────────────
     def log(*a):
         if args.verbose:
             print(*a, file=sys.stderr)

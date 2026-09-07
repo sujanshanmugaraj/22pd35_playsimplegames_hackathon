@@ -54,9 +54,9 @@ python solve.py tests/test4.txt --solver complete --verbose
 # Override the time budget (default: 58s, leaving margin under the 60s limit)
 python solve.py tests/test4.txt --time-limit 30
 
-# Run ALL tests in one shot with a full summary table (built into solve.py)
-python solve.py --test-all
-python solve.py --test-all --solvers complete fast --test-dir tests
+# Run ALL tests in one shot with a full summary table (use solve_with_time.py)
+python solve_with_time.py --test-all
+python solve_with_time.py --test-all --solvers complete fast --test-dir tests
 
 # Validate a solution move-by-move (re-simulates to prove legality)
 python validate.py tests/test4.txt complete
@@ -109,51 +109,8 @@ tests/
 ```
 
 ### Architecture Overview
+<img width="1024" height="559" alt="image" src="https://github.com/user-attachments/assets/15a1590a-7705-4bc4-8918-16b57277b190" />
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                        solve.py                         │
-│                                                         │
-│  ┌──────────┐   ┌──────────────────────────────────┐   │
-│  │  Parser  │   │          Level (immutable)        │   │
-│  │          │──▶│  Block[] · Gate[] · wall_mask     │   │
-│  │parse_    │   │  exit_anchors · dist_map (BFS)    │   │
-│  │level()   │   │  canon_groups · target_idx        │   │
-│  └──────────┘   └──────────────┬───────────────────┘   │
-│                                │                        │
-│                    ┌───────────▼───────────┐           │
-│                    │    State = tuple[int]  │           │
-│                    │  anchor cell per block │           │
-│                    │  -1 = exited           │           │
-│                    └───────────┬───────────┘           │
-│                                │                        │
-│           ┌────────────────────▼──────────────────┐    │
-│           │            neighbors(level, state)     │    │
-│           │  bitboard occupancy · slide walk       │    │
-│           │  ice check · directional dirs          │    │
-│           │  resolve_exits (cascade) · yield       │    │
-│           └──────┬──────────────────┬─────────────┘    │
-│                  │                  │                   │
-│    ┌─────────────▼──────┐  ┌───────▼──────────────┐   │
-│    │  Solver 1: COMPLETE │  │  Solver 2: FAST       │   │
-│    │                    │  │                        │   │
-│    │  decompose()       │  │  solve_wastar()        │   │
-│    │  → sub_level()     │  │  (weighted A*, quick)  │   │
-│    │  → _astar() per    │  │        ↓               │   │
-│    │    group           │  │  solve_beam()          │   │
-│    │        ↓           │  │  (bounded-width BFS)   │   │
-│    │  solve_exitmax()   │  │  → _beam_once(k)       │   │
-│    │  (ice / fallback)  │  │  → _shorten()          │   │
-│    └─────────────┬──────┘  └───────┬──────────────┘   │
-│                  └────────┬─────────┘                  │
-│                           │                             │
-│                    ┌──────▼──────┐                     │
-│                    │   _emit()   │  stdout only         │
-│                    │  STATUS     │  STATUS: SOLVED       │
-│                    │  MOVES      │  MOVES: N             │
-│                    │  block x y  │  block x y ...        │
-│                    └─────────────┘                      │
-└─────────────────────────────────────────────────────────┘
 
   validate.py ──calls──▶ solve.py subprocess ──▶ re-simulates output
   animation.py ─calls──▶ solve.py subprocess ──▶ renders board in terminal
@@ -200,37 +157,7 @@ python solve_with_time.py --test-all --verbose
 
 ### Sample output
 
-```
-=======================================================
- COLOR BLOCK CRUSH -- Test Suite Results
-=======================================================
-Level          Solver          Result  Moves      Time
--------------------------------------------------------
-test1.txt      complete  [PASS] SOLVED      2    0.04s
-               fast      [PASS] SOLVED      2    0.03s
--------------------------------------------------------
-test2.txt      complete  [PASS] SOLVED     10    0.51s
-               fast      [PASS] SOLVED     10    0.49s
--------------------------------------------------------
-test3.txt      complete  [PASS] SOLVED     24    1.12s
-               fast      [PASS] SOLVED     25    0.98s
--------------------------------------------------------
-test4.txt      complete  [PASS] SOLVED     56   41.20s
-               fast      [PASS] SOLVED    560   44.10s
--------------------------------------------------------
-test5.txt      complete  [PASS] SOLVED     43    3.30s
-               fast      [PASS] SOLVED     66    2.90s
--------------------------------------------------------
 
-=======================================================
- SUMMARY
-=======================================================
-Solver        Tests  Solved  Passed  TotalMoves  TotalTime  AvgTime
--------------------------------------------------------------------
-complete          5       5       5         135    46.17s    9.23s
-fast              5       5       5         663    48.50s    9.70s
-
-  *** ALL TESTS PASSED ***
 ```
 
 > Each row shows `[PASS]` / `[FAIL]`, the status, move count, and wall-clock time. The summary table shows total and average time per solver. Solutions are validated in-process after solving.
@@ -247,6 +174,7 @@ fast              5       5       5         663    48.50s    9.70s
 === COLOR BLOCK CRUSH -- REALTIME DUAL COMPARISON ===
 File: tests/test3.txt | Grid: 6x6 | Speed: 0.15s/move
 
+
 ┌──── COMPLETE ─────┐        ┌──── FAST ─────────┐
 Step: 3/24  | Exited: 1/11   Step: 3/25  | Exited: 1/11
 Action: Move 'A' -> (2,0)    Action: Move 'A' -> (2,0)
@@ -256,6 +184,7 @@ Action: Move 'A' -> (2,0)    Action: Move 'A' -> (2,0)
 │    G2 G2       │            │    G2 G2       │
 │       ██       │            │       ██       │
 └────────────────┘            └────────────────┘
+
 ```
 
 - **Colored blocks** are rendered with ANSI colors matching their color letter.
@@ -333,13 +262,13 @@ MODIFIERS:     ← Border: ^ v < > (gate direction). Interior: i2, -, |, or .
 
 ## 7. Code Breakdown — solve.py
 
-`solve.py` is a single self-contained file (~900 lines). Every section is separated by a comment banner. Here is a complete walkthrough.
+`solve.py` is a single self-contained file. The active solver code is ~916 lines (starting at line 922), preceded by ~920 lines of commented-out legacy code retained for reference. Every section is separated by a comment banner. Here is a complete walkthrough.
 
 ---
 
 ### 7.1 Data Model: Block, Gate, Level
 
-#### `Block` (lines 30–51)
+#### `Block` (lines 951–972)
 
 ```python
 class Block:
@@ -367,11 +296,11 @@ Stores everything about one block:
 
 **Why `__slots__`?** Eliminates the per-instance `__dict__`, reducing memory by ~40% when thousands of search nodes reference block data.
 
-#### `Gate` (lines 54–58)
+#### `Gate` (lines 975–979)
 
 Simple data class: `id`, `color`, `side` (`"top"/"bottom"/"left"/"right"`), `lo`, `hi` (the range of cells the gate spans along its edge).
 
-#### `Level` (lines 61–176)
+#### `Level` (lines 982–1097)
 
 The immutable board description built once before search begins.
 
@@ -381,7 +310,7 @@ The immutable board description built once before search begins.
 3. Detect identical blocks (same color+shape+ice+axis) for canonicalisation symmetry breaking.
 4. Call `_precompute(blk)` for each block.
 
-**`_precompute(blk)` — the key setup step (lines 127–176):**
+**`_precompute(blk)` — the key setup step (lines 1048–1097):**
 
 For each block, it runs once at level-load time and computes:
 
@@ -443,7 +372,7 @@ This is the hottest function — called millions of times per solve.
 
 ### 7.4 Heuristic & Canonicalisation
 
-#### Heuristic (lines 280–288)
+#### Heuristic (lines 1201–1209)
 
 ```python
 def heuristic(level, state):
@@ -452,7 +381,7 @@ def heuristic(level, state):
 
 For each target block still on the board, looks up `blk.dist_map[anchor_cell]` — the precomputed BFS distance through the walls-only slide graph from the current position to the nearest exit. This is **admissible** (never overestimates): the actual distance can only be longer due to other blocks blocking slides.
 
-#### Canonicalisation (lines 274–277)
+#### Canonicalisation (lines 1195–1198)
 
 ```python
 def canonical(level, state):
@@ -555,8 +484,10 @@ else:
 #### `solve_fast_single`
 
 ```
-1. Try weighted A* (wA*, weight=2.5) for up to min(3s, 25% of budget)
-   → Often solves simple levels instantly
+1. Try weighted A* (wA*, weight=2.5) for a quick_budget:
+   → 3.0s (ice levels) or 6.0s (non-ice), capped at 25% of total budget
+   → 3.0s is intentional: lets Test 5 (medium ice) solve directly in wA*
+     without triggering the more expensive beam search fallback passes
    → If SOLVED or UNSOLVABLE, return immediately
 
 2. Fall back to Beam Search with widths:
@@ -687,11 +618,26 @@ else:             self.dirs = DIRS     # all four directions
 `neighbors()` iterates `for ddx, ddy in blk.dirs` — so directional blocks naturally never generate moves in forbidden directions. No special-case code needed anywhere else.
 
 ---
-
 ## 10. Test Results
 
+### Optimal Move Sequence Output
+<img width="296" height="886" alt="image" src="https://github.com/user-attachments/assets/0386a5d7-4b07-44cf-a1d8-ed0dd3f47e88" />
+
+> **Specification & Output Compliance:** Raw terminal output generated by `--solver complete` solving `test4.txt`. The solver emits the exact competition standard: a `STATUS: SOLVED` header, the optimal move count (`MOVES: 56`), and the step-by-step block translation coordinates without intermediate formatting noise.
+
+---
+
+### Automated Test Suite Benchmarks
 <img width="597" height="344" alt="Screenshot 2026-09-06 232456" src="https://github.com/user-attachments/assets/f4130d8c-729c-4ae1-8a94-68eb77b45fec" />
 
+> **Dual-Engine Performance Comparison:** Full benchmark run across the standard test suite (`test1.txt` – `test5.txt`). While `complete` guarantees minimum path lengths (56 moves on Test 4), `fast` leverages bounded anytime beam search to slash execution time on deep combinatorial plateaus from **41.60s down to 16.57s** while passing all validation checks.
+
+---
+
+### Real-Time Dual-Solver Visualizer
+<img width="476" height="278" alt="image" src="https://github.com/user-attachments/assets/59f5b9c4-eef1-4dd3-b8b4-62c267df6010" />
+
+> **Synchronous Execution Animation:** Live terminal rendering running `complete` (left) and `fast` (right) side-by-side on `test3.txt`. The display visualizes dynamic board states, directional borders, thawed ice status, and live move steps, demonstrating path divergence and search behavior in real time.
 
 > Both solvers return within 60 seconds on all 5 test levels. 
 ---
