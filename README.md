@@ -262,13 +262,13 @@ MODIFIERS:     ← Border: ^ v < > (gate direction). Interior: i2, -, |, or .
 
 ## 7. Code Breakdown — solve.py
 
-`solve.py` is a single self-contained file. The active solver code is ~916 lines (starting at line 922), preceded by ~920 lines of commented-out legacy code retained for reference. Every section is separated by a comment banner. Here is a complete walkthrough.
+`solve.py` is a single self-contained file (~917 lines). Every section is separated by a comment banner. Here is a complete walkthrough.
 
 ---
 
 ### 7.1 Data Model: Block, Gate, Level
 
-#### `Block` (lines 951–972)
+#### `Block` (lines 30–51)
 
 ```python
 class Block:
@@ -296,11 +296,11 @@ Stores everything about one block:
 
 **Why `__slots__`?** Eliminates the per-instance `__dict__`, reducing memory by ~40% when thousands of search nodes reference block data.
 
-#### `Gate` (lines 975–979)
+#### `Gate` (lines 54–58)
 
 Simple data class: `id`, `color`, `side` (`"top"/"bottom"/"left"/"right"`), `lo`, `hi` (the range of cells the gate spans along its edge).
 
-#### `Level` (lines 982–1097)
+#### `Level` (lines 61–176)
 
 The immutable board description built once before search begins.
 
@@ -310,7 +310,7 @@ The immutable board description built once before search begins.
 3. Detect identical blocks (same color+shape+ice+axis) for canonicalisation symmetry breaking.
 4. Call `_precompute(blk)` for each block.
 
-**`_precompute(blk)` — the key setup step (lines 1048–1097):**
+**`_precompute(blk)` — the key setup step (lines 127–176):**
 
 For each block, it runs once at level-load time and computes:
 
@@ -372,7 +372,7 @@ This is the hottest function — called millions of times per solve.
 
 ### 7.4 Heuristic & Canonicalisation
 
-#### Heuristic (lines 1201–1209)
+#### Heuristic (lines 280–288)
 
 ```python
 def heuristic(level, state):
@@ -381,7 +381,7 @@ def heuristic(level, state):
 
 For each target block still on the board, looks up `blk.dist_map[anchor_cell]` — the precomputed BFS distance through the walls-only slide graph from the current position to the nearest exit. This is **admissible** (never overestimates): the actual distance can only be longer due to other blocks blocking slides.
 
-#### Canonicalisation (lines 1195–1198)
+#### Canonicalisation (lines 274–277)
 
 ```python
 def canonical(level, state):
@@ -661,7 +661,7 @@ python validate.py --all --script solve_with_time.py
 1. Block exists in the level.
 2. Block has not already exited.
 3. Block is not frozen (ice constraint).
-4. Destination is a legal slide (checked via `solve.neighbors`).
+4. Destination is a legal slide — checked via `_block_dests()` (pure geometry; faster than `neighbors()` which would compute moves for every other block just to validate one).
 5. Final board state is a goal (all target blocks exited).
 
 Exit code is `0` if all tests pass, `1` if any test fails.
